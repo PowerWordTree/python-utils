@@ -1,0 +1,30 @@
+[project]
+name = "pwt.utils"
+version = "0.1.0"
+requires-python = ">= 3.10"
+readme = "README.md"
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.optional-dependencies]
+DEV = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=1.0.0",
+    "requests",
+    "numpy",
+    "pydantic",
+    "rule_engine",
+]
+HTTP = ["requests"]
+NDARRAY_AUDIO_UTILS = ["numpy"]
+PYDANTIC_UTILS = ["pydantic"]
+LOG_FILTER = ["rule_engine"]
+LOG_CONFIG = ["pydantic", "rule_engine"]
+EXPRESSION = ["rule_engine"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+asyncio_mode = "auto"
+pythonpath = ["src"]
+testpaths = ["tests"]
