@@ -7,7 +7,7 @@ license = { file = "LICENSE" }
 dependencies = []
 
 [project.optional-dependencies]
-DEV = [
+dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=1.0.0",
     "requests",
@@ -15,12 +15,12 @@ DEV = [
     "pydantic",
     "rule_engine",
 ]
-HTTP = ["requests"]
-NDARRAY_AUDIO_UTILS = ["numpy"]
-PYDANTIC_UTILS = ["pydantic"]
-LOG_FILTER = ["rule_engine"]
-LOG_CONFIG = ["pydantic", "rule_engine"]
-EXPRESSION = ["rule_engine"]
+http = ["requests"]
+ndarray_audio_utils = ["numpy"]
+expression = ["rule_engine"]
+pydantic_utils = ["pydantic", "rule_engine"]
+log_filter = ["rule_engine"]
+log_config = ["pydantic", "rule_engine"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
