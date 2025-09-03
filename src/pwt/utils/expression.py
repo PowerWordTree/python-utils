@@ -18,8 +18,6 @@ class ExpressionError(Exception):
 class ExprFlag:
     """表达式标志位占位类型(预留, 暂未使用)"""
 
-    pass
-
 
 class Expression:
     """

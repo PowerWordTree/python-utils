@@ -55,6 +55,7 @@ def convert_data_layout(
 ) -> np.ndarray:
     """
     转换音频数据的布局类型.
+
     根据指定的布局类型, 将输入音频数据从一种布局转换为另一种.
     支持的布局类型包括:
         - "interleaved": 交错布局, 常见于主流音频格式如 WAV/MP3.

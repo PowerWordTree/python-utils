@@ -49,9 +49,11 @@
     ```
 """
 
+from __future__ import annotations
+
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Self, override
+from typing import Any
 
 from pwt.utils.decorator import Decorator
 
@@ -63,7 +65,7 @@ class Timeout(Decorator):
     支持同步函数和异步函数.
 
     属性:
-        func (Callable[..., Any]): 被装饰的函数.
+
         timeout (float | None): 超时时间, 单位为秒.
         executor (ThreadPoolExecutor | None): 线程池执行器.
 
@@ -72,11 +74,8 @@ class Timeout(Decorator):
         async_wrapper(*args: Any, **kwargs: Any) -> Any: 异步调用的包装方法.
     """
 
-    @override
     def __init__(
         self,
-        func: Callable[..., Any] = Self,
-        /,
         *,
         timeout: float | None = None,
         executor: ThreadPoolExecutor | None = None,
@@ -85,16 +84,14 @@ class Timeout(Decorator):
         初始化 `Timeout` 装饰器.
 
         参数:
-            func (Callable[..., Any], optional): 被装饰的函数, 默认用 Self 占位.
+
             timeout (float | None, optional): 超时时间, 单位为秒, 默认为 `None`.
             executor (ThreadPoolExecutor | None, optional): 线程池执行器. 默认为 `None`.
         """
-        super().__init__(func, timeout=timeout, executor=executor)
-        self.func = func
+        super().__init__(timeout=timeout, executor=executor)
         self.timeout = timeout
         self.executor = executor
 
-    @override
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
         """
         同步函数的包装方法.
@@ -124,7 +121,6 @@ class Timeout(Decorator):
             future = executor.submit(self.func, *args, **kwargs)
             return future.result(timeout=self.timeout)
 
-    @override
     async def async_wrapper(self, *args: Any, **kwargs: Any) -> Any:
         """
         异步函数的包装方法.

@@ -1,11 +1,13 @@
 import re
 from typing import Any
-from requests import Session, Response, exceptions
+
+from requests import Response, Session, exceptions
 
 from pwt.utils.decorator import Decorator
 from pwt.utils.log import log_helpers
 
 logger = log_helpers.get_logger_adapter(__name__)
+
 
 class LogRequestsException(Decorator):
     """
@@ -61,7 +63,6 @@ class LogRequestsException(Decorator):
 
 
 class Http(Session):
-
     def __init__(self, base_url: str) -> None:
         super().__init__()
         self.base_url = base_url

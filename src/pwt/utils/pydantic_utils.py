@@ -10,8 +10,10 @@
 转换器和检查器均以 BeforeValidator / AfterValidator 装饰器形式封装, 可直接应用于字段验证.
 """
 
+from __future__ import annotations
+
 from functools import partial
-from typing import Any, Callable, Literal, Self
+from typing import Any, Callable, Literal
 
 from pydantic import (
     AfterValidator,
@@ -77,8 +79,9 @@ def convert(
         data_shape: 输入数据结构类型.
         ignore_none: 值为 None 时是否跳过转换.
         description: 自定义错误信息.
-        expr_context: 表达式上下文字典, 仅作用于 `expression`. 
-        **func_kwds: 传给 `func` 的额外关键字参数. 
+
+        expr_context: 表达式上下文字典, 仅作用于 `expression`.
+        **func_kwds: 传给 `func` 的额外关键字参数.
 
     Returns:
         可用于 Pydantic 字段的转换器.
@@ -151,8 +154,9 @@ def check(
         ignore_none: 值为 None 时是否跳过检查.
         check_result: 是否检查函数返回值为真.
         description: 自定义错误信息.
-        expr_context: 表达式上下文字典, 仅作用于 `expression`. 
-        **func_kwds: 传给 `func` 的额外关键字参数. 
+
+        expr_context: 表达式上下文字典, 仅作用于 `expression`.
+        **func_kwds: 传给 `func` 的额外关键字参数.
 
     Returns:
         可用于 Pydantic 字段的检查器.
@@ -203,7 +207,7 @@ class BaseModelEx(BaseModel):
     @field_validator("*", mode="wrap")
     @classmethod
     def use_default_value(
-        cls: type[Self],
+        cls: type[BaseModelEx],
         value: Any,
         validator: ValidatorFunctionWrapHandler,
         info: ValidationInfo,

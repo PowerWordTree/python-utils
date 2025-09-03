@@ -398,8 +398,6 @@ class DLinkedList:  # Doubly Linked List (DLinkedList or DLL)
             raise ValueError("Cannot remove sentinel node")
         node.prev.next = node.next
         node.next.prev = node.prev
-        # node.prev = node
-        # node.next = node
         del node.prev
         del node.next
         self._length -= 1
@@ -607,8 +605,6 @@ class DLinkedList:  # Doubly Linked List (DLinkedList or DLL)
         node = self._sentinel.next
         while node is not self._sentinel:
             next_node = node.next
-            # node.prev = self._sentinel
-            # node.next = self._sentinel
             del node.prev
             del node.next
             node = next_node

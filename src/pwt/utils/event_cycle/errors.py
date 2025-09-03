@@ -1,20 +1,18 @@
 """
-异常模型
-
-定义事件调度器使用的异常体系, 支持错误链追踪与分层处理机制. 
+定义事件调度器使用的异常体系, 支持错误链追踪与分层处理机制.
 
 异常层级结构如下:
-    - EventCycleError: 所有异常的统一基类, 支持嵌套链式追踪. 
-        - CycleInternalError: 系统级错误, 非用户代码导致. 
-            - CycleSelectError: 与 selector 调用相关的 I/O 异常. 
-        - CycleHandlerError: 事件处理器执行时发生的用户代码异常. 
-            - CycleReadHandlerError: 读取事件回调出错. 
-            - CycleWriteHandlerError: 写入事件回调出错. 
+    - EventCycleError: 所有异常的统一基类, 支持嵌套链式追踪.
+        - CycleInternalError: 系统级错误, 非用户代码导致.
+            - CycleSelectError: 与 selector 调用相关的 I/O 异常.
+        - CycleHandlerError: 事件处理器执行时发生的用户代码异常.
+            - CycleReadHandlerError: 读取事件回调出错.
+            - CycleWriteHandlerError: 写入事件回调出错.
 
 主要用途:
-    - 为 EventCycle 提供统一的异常捕获与分类处理能力; 
-    - 支持基于异常类型的容错回调与中断机制; 
-    - 保留原始异常信息以辅助调试与追溯. 
+    - 为 EventCycle 提供统一的异常捕获与分类处理能力;
+    - 支持基于异常类型的容错回调与中断机制;
+    - 保留原始异常信息以辅助调试与追溯.
 """
 
 from __future__ import annotations

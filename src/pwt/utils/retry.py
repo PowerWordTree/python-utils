@@ -63,7 +63,7 @@
 import asyncio
 import random
 from time import sleep
-from typing import Any, Callable, Iterable, Self, Type, override
+from typing import Any, Callable, Iterable, Type
 
 from pwt.utils.decorator import Decorator
 
@@ -120,37 +120,32 @@ class Retry(Decorator):
     用于执行重试操作, 继承自 `Decorator` 类.
 
     属性:
-        func (Callable[..., Any]): 被装饰的函数.
-        kwds (dict[str, Any]): 传递给装饰器的参数.
+
+        interval (Callable[[RetryState], float]): 计算延迟时间的函数.
+        retryable (Callable[[RetryState], bool]): 判断是否可重试的函数.
 
     方法:
         wrapper(*args: Any, **kwargs: Any) -> Any: 同步调用的包装方法.
         async_wrapper(*args: Any, **kwargs: Any) -> Any: 异步调用的包装方法.
     """
 
-    @override
     def __init__(
         self,
-        func: Callable[..., Any] = Self,
-        /,
         *,
         interval: Callable[[RetryState], float],
         retryable: Callable[[RetryState], bool],
     ) -> None:
         """
-        初始化 `Retry` 实例.
+        初始化实例.
 
         参数:
-            func (Callable[..., Any]): 要重试的函数, 用 `Self` 占位.
             interval (Callable[[RetryState], float]): 计算延迟时间的函数.
             retryable (Callable[[RetryState], bool]): 判断是否可重试的函数.
         """
-        super().__init__(func, interval=interval, retryable=retryable)
-        self.func = func
+        super().__init__(interval=interval, retryable=retryable)
         self.interval = interval
         self.retryable = retryable
 
-    @override
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
         """
         同步函数的包装方法
@@ -184,8 +179,6 @@ class Retry(Decorator):
             state.delay = self.interval(state)
             sleep(state.delay)
 
-    # TODO: 是否能输出debug日志?
-    @override
     async def async_wrapper(self, *args: Any, **kwargs: Any) -> Any:
         """
         异步函数的包装方法.
@@ -231,11 +224,8 @@ class SimpleRetry(Retry):
     用于执行重试操作, 继承自 `Retry` 类.
     """
 
-    @override
     def __init__(
         self,
-        func: Callable[..., Any] = Self,
-        /,
         *,
         delay: float = 1,
         retries: int = 3,
@@ -253,7 +243,6 @@ class SimpleRetry(Retry):
             results (Iterable[Any], 可选): 可重试的结果列表, 默认为空列表.
         """
         super().__init__(
-            func,
             interval=fixd_interval(delay),
             retryable=fixd_retryable(retries, exceptions, results),
         )
@@ -266,11 +255,8 @@ class AdvancedRetry(Retry):
     用于执行重试操作, 继承自 `Retry` 类.
     """
 
-    @override
     def __init__(
         self,
-        func: Callable[..., Any] = Self,
-        /,
         *,
         factor: float = 1,
         maximum: float = 64,
@@ -294,7 +280,6 @@ class AdvancedRetry(Retry):
             results (Iterable[Any], 可选): 可重试的结果列表, 默认为空列表.
         """
         super().__init__(
-            func,
             interval=exponential_backoff_interval(factor, maximum, base, jitter),
             retryable=fixd_retryable(retries, exceptions, results),
         )

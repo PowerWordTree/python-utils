@@ -56,10 +56,6 @@ plugin1 = "plugin_base:Plugin"
 ```
 """
 
-__version__ = "1.1.0"
-__author__ = "FB"
-__license__ = "MIT License"
-
 import importlib
 from abc import ABC, abstractmethod
 from importlib.metadata import entry_points
@@ -73,8 +69,6 @@ class PluginError(Exception):
     作为所有插件相关异常的公共父类, 主要用于异常类型的判断.
     当在插件系统的各个环节出现异常时, 可通过判断是否为该类的实例来处理插件相关异常.
     """
-
-    pass
 
 
 class PluginNotFoundError(PluginError):
@@ -158,8 +152,6 @@ class PluginBase(ABC):
         Raises:
             Exception: 当插件执行过程中发生错误时抛出, 插件实现可以根据需要抛出异常.
         """
-
-        pass
 
     @classmethod
     def from_entry_point(

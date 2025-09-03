@@ -5,6 +5,7 @@ import logging
 import string
 import sys
 import traceback
+from types import MappingProxyType
 from typing import Any, Iterable, Literal
 
 from pwt.utils import json_normalizer
@@ -267,6 +268,20 @@ class LoggerAdapter:
         self.logger.log(level, msg, *args, **kwargs)
 
 
+def get_level_names_mapping():
+    """
+    兼容 Python 3.10 及以下版本的 logging.getLevelNamesMapping()
+    返回: 名称 -> 数值 的映射(不可修改)
+    """
+    if hasattr(logging, "getLevelNamesMapping"):
+        # Python 3.11+, 直接用官方方法
+        return logging.getLevelNamesMapping()  # type: ignore
+    else:
+        # Python <= 3.10, 基于内部变量构造只读映射
+        # 用 MappingProxyType 包一层, 避免调用方修改原 dict
+        return MappingProxyType(dict(logging._nameToLevel))
+
+
 def level_range(
     first: int = 0, last: int = 100, levels: Iterable[int] | None = None
 ) -> set[int]:
@@ -281,7 +296,7 @@ def level_range(
       区间内的Level集合.
     """
 
-    levels = levels or logging.getLevelNamesMapping().values()
+    levels = levels or get_level_names_mapping().values()
     return {i for i in levels if i != 0 and first <= i and i <= last}
 
 
@@ -297,7 +312,7 @@ def get_level(name: str) -> int:
         ValueError: 无此等级时抛出
     """
 
-    mapping = logging.getLevelNamesMapping()
+    mapping = get_level_names_mapping()
     if name not in mapping:
         raise ValueError(f"Unknown level: {name}")
     return mapping[name]
