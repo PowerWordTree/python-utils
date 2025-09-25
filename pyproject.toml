@@ -16,11 +16,11 @@ dev = [
     "rule_engine",
 ]
 http = ["requests"]
-ndarray_audio_utils = ["numpy"]
+ndarray-audio-utils = ["numpy"]
 expression = ["rule_engine"]
-pydantic_utils = ["pydantic", "rule_engine"]
-log_filter = ["rule_engine"]
-log_config = ["pydantic", "rule_engine"]
+pydantic-utils = ["pydantic", "rule_engine"]
+log-filter = ["rule_engine"]
+log-config = ["pydantic", "rule_engine"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
