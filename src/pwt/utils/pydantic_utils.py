@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import reprlib
 from functools import partial
 from typing import Any, Callable, Literal
 
@@ -29,25 +30,34 @@ from pydantic_core import PydanticCustomError, PydanticUndefined
 from pwt.utils.expression import Expression
 
 
-def format_validation_error(exc: ValidationError) -> list[dict[str, Any]]:
+def format_validation_error(exc: ValidationError, verbose: bool = False) -> str:
     """
-    将 Pydantic 的 ValidationError 转换为结构化错误列表.
+    将 Pydantic 的 ValidationError 转换为字符串.
 
     Args:
-        exc: Pydantic 抛出的验证异常对象.
+        exc: Pydantic 抛出的验证异常对象
+        verbose: 是否显示 input 值（默认 False）
 
     Returns:
-        每个错误包含字段路径/提示信息/错误类型和原始输入值.
+        格式化后的错误字符串
     """
-    return [
-        {
-            "field": ".".join(map(str, error.get("loc", ()))),
-            "message": error.get("msg", None),
-            "type": error.get("type", None),
-            "input": error.get("input", None),
-        }
-        for error in exc.errors()
-    ]
+    errors = exc.errors()
+
+    lines: list[str] = [f"{len(errors)} validation error(s) for {exc.title}"]
+    for error in errors:
+        s_field = ".".join(map(str, error["loc"] or ["<root>"]))
+        lines.append(f"{s_field}")
+
+        s_message = error["msg"] or "<missing>"
+        s_type = error["type"] or "<missing>"
+        lines.append(f"  {s_message} (type={s_type})")
+
+        if verbose and "input" in error:
+            s_input_type = type(error["input"]).__name__
+            s_input_value = reprlib.repr(error["input"])
+            lines.append(f"  [input_type={s_input_type}, input_value={s_input_value}]")
+
+    return "\n".join(lines)
 
 
 def _noop(data: Any) -> Any:
