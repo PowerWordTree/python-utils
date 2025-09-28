@@ -36,7 +36,7 @@ def format_validation_error(exc: ValidationError, verbose: bool = False) -> str:
 
     Args:
         exc: Pydantic 抛出的验证异常对象
-        verbose: 是否显示 input 值（默认 False）
+        verbose: 是否显示 input 值(默认 False)
 
     Returns:
         格式化后的错误字符串
