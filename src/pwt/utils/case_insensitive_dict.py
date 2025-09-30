@@ -13,7 +13,7 @@
 
 示例:
     >>> from case_insensitive_dict import CaseInsensitiveDict
-    >>> d = CaseInsensitiveDict(PATH="A", Path="B", Home="C")
+    >>> d = CaseInsensitiveDict({"PATH": "A"}, {"Path": "B"}, {"Home": "C"})
     >>> d["path"]
     'B'
     >>> "PaTh" in d
@@ -35,10 +35,13 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping
-from typing import Any, Hashable, Iterator
+from typing import Any, Generic, Hashable, Iterator, TypeVar
+
+K = TypeVar("K", bound=Hashable)
+V = TypeVar("V")
 
 
-class CaseInsensitiveDict(MutableMapping):
+class CaseInsensitiveDict(MutableMapping[K, V], Generic[K, V]):
     """
     对字符串键大小写不敏感的字典实现.
 
@@ -57,18 +60,15 @@ class CaseInsensitiveDict(MutableMapping):
     - **大小写不敏感(仅字符串)**: `"PATH"`, `"Path"`, `"path"` 视为同一逻辑键.
     - **保留原始键形态**: 覆盖写入后, `keys()`/`items()` 展示最后一次写入的大小写.
     - **广泛键支持**: 非字符串键(如 int/tuple/frozenset)按原样处理.
-    - **行为对齐 dict**: 在键不存在时抛 KeyError; 其余默认方法沿用 MutableMapping 语义.
     """
 
-    def __init__(self, data=None, **kwargs):
-        self._data: dict[Hashable, Any] = {}
-        self._map: dict[Hashable, Hashable] = {}
-        if data:
-            self.update(data)
-        if kwargs:
-            self.update(kwargs)
+    def __init__(self, *args: MutableMapping[K, V] | Iterator[tuple[K, V]]) -> None:
+        self._data: dict[K, V] = {}
+        self._map: dict[Hashable, K] = {}
+        for arg in args:
+            self.update(arg)
 
-    def __setitem__(self, key: Hashable, value: Any) -> None:
+    def __setitem__(self, key: K, value: V) -> None:
         norm_key = self._normalize_key(key)
         if norm_key in self._map:
             orig_key = self._map.pop(norm_key)
@@ -76,18 +76,17 @@ class CaseInsensitiveDict(MutableMapping):
         self._data[key] = value
         self._map[norm_key] = key
 
-    def __getitem__(self, key: Hashable) -> Any:
+    def __getitem__(self, key: K) -> V:
         norm_key = self._normalize_key(key)
         orig_key = self._map[norm_key]
         return self._data[orig_key]
 
-    def __delitem__(self, key: Hashable) -> None:
+    def __delitem__(self, key: K) -> None:
         norm_key = self._normalize_key(key)
         orig_key = self._map.pop(norm_key)
         del self._data[orig_key]
 
-    def __iter__(self) -> Iterator[Hashable]:
-        # 遍历原始 key
+    def __iter__(self) -> Iterator[K]:
         return iter(self._data)
 
     def __len__(self) -> int:
@@ -101,7 +100,7 @@ class CaseInsensitiveDict(MutableMapping):
         inner = ", ".join(f"{k!r}: {v!r}" for k, v in self._data.items())
         return f"{self.__class__.__name__}({{{inner}}})"
 
-    def _normalize_key(self, key: Hashable) -> Hashable:
+    def _normalize_key(self, key: K) -> Hashable:
         if isinstance(key, str):
             return key.casefold()
         return key
