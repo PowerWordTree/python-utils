@@ -35,7 +35,7 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping
-from typing import Any, Generic, Hashable, Iterator, TypeVar
+from typing import Any, Generic, Hashable, Iterator, Mapping, TypeVar
 
 K = TypeVar("K", bound=Hashable)
 V = TypeVar("V")
@@ -62,7 +62,7 @@ class CaseInsensitiveDict(MutableMapping[K, V], Generic[K, V]):
     - **广泛键支持**: 非字符串键(如 int/tuple/frozenset)按原样处理.
     """
 
-    def __init__(self, *args: MutableMapping[K, V] | Iterator[tuple[K, V]]) -> None:
+    def __init__(self, *args: Mapping[K, V] | Iterator[tuple[K, V]]) -> None:
         self._data: dict[K, V] = {}
         self._map: dict[Hashable, K] = {}
         for arg in args:
