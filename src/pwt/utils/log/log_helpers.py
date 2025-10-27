@@ -102,8 +102,6 @@ class EnhancedFormatter(logging.Formatter):
 
         # 输出text日志
         if self.output_format == "text":
-            if record.levelno < logging.INFO:  # DEBUG
-                return "\033[2m" + self.formatMessage(record) + "\033[0m"
             return self.formatMessage(record)
         # 输出json日志
         return self.formatJson(record)
