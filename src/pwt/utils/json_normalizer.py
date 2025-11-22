@@ -21,6 +21,7 @@ import traceback
 import types
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime
+from enum import Enum
 from functools import singledispatch
 from typing import Any, Literal, NamedTuple
 
@@ -181,8 +182,8 @@ def _dispatch(value: Any, context: NormalizeContext) -> Any:
 @_dispatch.register(int)
 @_dispatch.register(float)
 @_dispatch.register(bool)
-@_dispatch.register(type(None))
-def _(value: str, context: NormalizeContext) -> Any:
+@_dispatch.register(types.NoneType)
+def _(value: Any, context: NormalizeContext) -> Any:
     """基础类型直接返回原值."""
     return value
 
@@ -205,6 +206,12 @@ def _(value: datetime, context: NormalizeContext) -> Any:
 def _(value: time.struct_time, context: NormalizeContext) -> Any:
     """time.struct_time 转为 ISO 格式字符串(秒精度)."""
     return time.strftime("%Y-%m-%dT%H:%M:%S", value)
+
+
+@_dispatch.register(Enum)
+def _(value: Enum, context: NormalizeContext) -> Any:
+    """枚举类型转为字符串."""
+    return str(value)
 
 
 @_dispatch.register(BaseException)
