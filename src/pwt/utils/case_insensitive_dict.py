@@ -1,15 +1,15 @@
 """
-提供一个大小写不敏感的字典实现。
+提供一个大小写不敏感的字典实现. 
 
 设计目标:
-- 对字符串键使用大小写折叠 (casefold) 进行归一化，确保跨语言一致的大小写不敏感。
-- 非字符串键保持原样 (支持所有可哈希类型作为键)。
-- 保留“最后一次写入”的原始键形式；遍历时输出该原始形式。
-- 基于 collections.abc.MutableMapping，只需实现核心方法，其余行为沿用默认实现。
-- 当覆盖写入同一逻辑键 (例如 "PATH" 与 "Path") 时，以最后一次写入的原始键形式为准。
+- 对字符串键使用大小写折叠 (casefold) 进行归一化, 确保跨语言一致的大小写不敏感. 
+- 非字符串键保持原样 (支持所有可哈希类型作为键). 
+- 保留"最后一次写入"的原始键形式; 遍历时输出该原始形式. 
+- 基于 collections.abc.MutableMapping, 只需实现核心方法, 其余行为沿用默认实现. 
+- 当覆盖写入同一逻辑键 (例如 "PATH" 与 "Path") 时, 以最后一次写入的原始键形式为准. 
 
 主要组件:
-- CaseInsensitiveDict: 大小写不敏感键的字典类。
+- CaseInsensitiveDict: 大小写不敏感键的字典类. 
 
 示例:
     >>> from case_insensitive_dict import CaseInsensitiveDict
@@ -61,10 +61,10 @@ class CaseInsensitiveDict(MutableMapping[K, V], Generic[K, V]):
     - **保留原始键形态**: 覆盖写入后, `keys()`/`items()` 展示最后一次写入的大小写.
     - **广泛键支持**: 非字符串键(如 int/tuple/frozenset)按原样处理.
     特性:
-    - **大小写不敏感 (仅字符串键)**: `"PATH"`, `"Path"`, `"path"` 视为同一逻辑键。
-    - **保留原始键形态**: 覆盖写入后，`keys()`/`items()` 展示最后一次写入的大小写。
-    - **广泛键支持**: 非字符串键 (如 int/tuple/frozenset) 按原样处理。
-    - **构造器 kwargs 限制**: 仅在 K 为 str 时有效，类型系统无法表达该约束，故忽略检查。
+    - **大小写不敏感 (仅字符串键)**: `"PATH"`, `"Path"`, `"path"` 视为同一逻辑键. 
+    - **保留原始键形态**: 覆盖写入后, `keys()`/`items()` 展示最后一次写入的大小写. 
+    - **广泛键支持**: 非字符串键 (如 int/tuple/frozenset) 按原样处理. 
+    - **构造器 kwargs 限制**: 仅在 K 为 str 时有效, 类型系统无法表达该约束, 故忽略检查. 
     """
 
     @overload
@@ -78,7 +78,7 @@ class CaseInsensitiveDict(MutableMapping[K, V], Generic[K, V]):
         for arg in args:
             self.update(arg)
         if kwargs:
-            # kwargs 的 key 永远是 str，但 K 是泛型，类型系统无法表达这种约束
+            # kwargs 的 key 永远是 str, 但 K 是泛型, 类型系统无法表达这种约束
             self.update(kwargs)  # type: ignore
 
     def __setitem__(self, key: K, value: V) -> None:
