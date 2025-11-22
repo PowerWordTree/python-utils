@@ -1,190 +1,395 @@
 """
-通用装饰器基类
+通用装饰器辅助工具 (Decorator)
 
-该模块提供了一个可继承的装饰器基类, 可同时用于同步和异步函数.
-它支持**有参**和**无参**两种装饰器形式, 并允许分阶段传递装饰器参数(多次调用累积参数).
+本模块提供统一的装饰器工厂类, 用于简化装饰器的编写过程. 
 
-核心机制:
-    - **阶段 1(参数收集阶段)**:
-        如果第一个位置参数不是可识别的函数/方法类型(见 FUNC_TYPES),
-        则认为这是在传递装饰器参数, 返回一个新的基类实例以继续收集参数.
-    - **阶段 2(绑定函数阶段)**:
-        如果第一个位置参数是函数/方法, 则认为这是最终的被装饰对象,
-        创建子类实例并调用其 `__init__` 注册装饰器参数, 然后返回包装器函数.
+核心特性: 
+- 使用 `Params` 对象统一收集和传递装饰器参数
+- 支持直接传参的简化语法(可能产生歧义时需谨慎使用)
+- 支持分阶段传参: 通过多次调用逐步累积参数
+- 在参数合并时自动处理关键字参数到位置参数的转换
+- 支持 Ellipsis (`...`) 占位符: 跳过特定参数, 保留之前的值
+- 同时兼容函数式和类式装饰器
+- 保留完整的函数签名 (ParamSpec/TypeVar), 确保 IDE 友好性
 
-特点:
-    - 同时支持同步和异步函数(自动选择 `wrapper` 或 `async_wrapper`).
-    - 支持多阶段参数传递(可分多次调用设置装饰器参数).
-    - 子类只需实现 `wrapper` / `async_wrapper` 即可定义装饰逻辑.
+参数处理机制: 
+- 基于 inspect 模块分析装饰器函数签名
+- 建立参数名到位置索引的映射关系
+- 在参数合并时自动处理关键字参数到位置参数的转换
+- 支持 Ellipsis 占位符实现参数跳过功能
 
 使用示例:
-    ```python
-    class ExampleDecorator(Decorator):
-        def __init__(self, arg1=1, arg2=2, *, kwarg1=None, kwarg2=None):
-            # 这里是注册装饰器参数的地方
-            # 不调用 super().__init__ 也能在 self.kwargs 中获取到全部装饰器参数
-            super().__init__(1, 2, kwarg1=None, kwarg2=None)
-            self.arg1 = arg1
-            self.arg2 = arg2
-            self.kwarg1 = kwarg1
-            self.kwarg2 = kwarg2
+    # 函数式装饰器定义
+    @Decorator
+    def my_decorator(func, func_args, func_kwargs, prefix="", suffix=""):
+        print(f"{prefix}Before{suffix}")
+        result = func(*func_args, **func_kwargs)
+        print(f"{prefix}After{suffix}")
+        return result
 
-        def wrapper(self, *args, **kwargs):
-            print("before")
-            result = super().wrapper(*args, **kwargs)
-            print("after")
-            return result
+    # 无参模式使用
+    @my_decorator
+    def foo(): ...
 
-        async def async_wrapper(self, *args, **kwargs):
-            print("before async")
-            result = await super().async_wrapper(*args, **kwargs)
-            print("after async")
-            return result
-
-    @ExampleDecorator
-    def foo():
-        pass
-
-    @ExampleDecorator(1, 2)
-    def bar():
-        pass
+    # 有参模式使用
+    @my_decorator(prefix=">>>", suffix="<<<")
+    def bar(): ...
 
     # 分阶段传参
-    deco = ExampleDecorator(arg1=123)
-    @deco(arg2=456)
-    def baz():
-        pass
-    @deco(arg2=789)
-    def baz2():
-        pass
-    ```
+    deco = my_decorator(prefix=">>>")
+    @deco(suffix="<<<")
+    def baz(): ...
+
+    # 使用 Params 显式传参
+    params = Params(prefix=">>>", suffix="<<<")
+    @my_decorator(params)
+    def qux(): ...
+
+    # 使用 Ellipsis 占位符
+    @my_decorator(..., suffix="<<<")
+    def quux(): ...
+
+    # 类式装饰器定义
+    @Decorator
+    class MyDecorator:
+        def __init__(self, func, prefix="", suffix=""):
+            self.func = func
+            self.prefix = prefix
+            self.suffix = suffix
+
+        def __call__(self, *args, **kwargs):
+            print(f"{self.prefix}Before{self.suffix}")
+            result = self.func(*args, **kwargs)
+            print(f"{self.prefix}After{self.suffix}")
+            return result
+
+    # 类式装饰器使用示例
+    @MyDecorator("test")
+    def foo(): ...
+
+    @MyDecorator("test", prefix=">>> ", suffix=" <<<")
+    def bar(): ...
+
+    deco = MyDecorator("test", prefix=">>> ")
+    @deco(suffix=" <<<")
+    def baz(): ...
+
+    @MyDecorator("test", ..., suffix=" <<<")
+    def qux(): ...
 """
 
 from __future__ import annotations
 
-import asyncio
 import functools
-import types
-from typing import Any, Callable, Type, final
+import inspect
+from itertools import zip_longest
+from typing import (
+    Any,
+    Callable,
+    Generic,
+    ParamSpec,
+    Protocol,
+    TypeVar,
+    cast,
+    overload,
+    runtime_checkable,
+)
+
+P = ParamSpec("P")
+R = TypeVar("R", covariant=True)
+DP = ParamSpec("DP")
 
 
-class Decorator:
+@runtime_checkable
+class DecoratorFunction(Protocol[DP]):
     """
-    通用装饰器基类.
+    装饰器函数协议, 定义装饰器函数的标准签名. 
+
+    装饰器函数应接收以下参数: 
+    - func: 被装饰的目标函数
+    - func_args: 被装饰函数的位置参数
+    - func_kwargs: 被装饰函数的关键字参数
+    - *args: 装饰器自身的位置参数
+    - **kwargs: 装饰器自身的关键字参数
+
+    用途:
+        用于类型检查, 确保装饰器函数符合预期的签名格式. 
+    """
+
+    def __call__(
+        self,
+        func: Callable[..., Any],
+        func_args: tuple[Any, ...],
+        func_kwargs: dict[str, Any],
+        *args: DP.args,
+        **kwargs: DP.kwargs,
+    ) -> Any: ...
+
+
+@runtime_checkable
+class DecoratorClass(Protocol[DP]):
+    """
+    装饰器类协议, 定义装饰器类的标准签名. 
+
+    装饰器类应实现以下方法: 
+    - __init__: 接收被装饰的函数和装饰器参数
+    - __call__: 包装并调用被装饰的函数
+
+    用途:
+        用于类型检查, 确保装饰器类符合预期的签名格式. 
+    """
+
+    def __init__(
+        self, func: Callable[..., Any], *args: DP.args, **kwargs: DP.kwargs
+    ) -> None: ...
+    def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+
+
+class Params(Generic[DP]):
+    """
+    参数容器类, 用于显式收集和传递装饰器参数. 
+
+    特性:
+        - 支持位置参数和关键字参数的统一传递
+        - 可跨阶段传递, 避免上下文信息丢失
+        - 与 Ellipsis 配合使用时支持参数跳过功能
+    """
+
+    @overload
+    def __init__(self, *args: DP.args, **kwargs: DP.kwargs) -> None: ...
+    @overload
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.args = args
+        self.kwargs = kwargs
+
+
+class Decorator(Generic[DP]):
+    """
+    通用装饰器工厂类. 
+
+    该类提供统一的装饰器工厂接口, 通过抽象装饰器的参数收集与目标绑定逻辑, 
+    支持多种使用模式, 简化装饰器的编写过程. 
+
+    主要功能:
+        - 使用 `Params` 对象统一管理装饰器参数
+        - 支持直接传参的简化语法(可能产生歧义)
+        - 支持分阶段传参: 多次调用逐步累积参数
+        - 在参数合并时自动处理关键字参数到位置参数的转换
+        - 支持 Ellipsis (`...`) 占位符: 跳过参数, 保留之前的值
+        - 同时兼容函数式和类式装饰器
+        - 保留完整的函数签名, 确保 IDE 友好性
 
     属性:
-        cls (Type[decorator]): 装饰器类.
-        func (Callable[..., Any]): 被装饰的函数对象.
-        args (tuple[Any]): 在装饰器参数收集阶段累积的位置参数.
-        kwargs (dict[str, Any]): 在装饰器参数收集阶段累积的关键字参数.
+        Decorator: 装饰器函数或类
+        args: 已收集的位置参数
+        kwargs: 已收集的关键字参数
 
-    方法:
-        __init__(self, ...) -> None:
-            初始化装饰器参数, 子类需重写.
-        wrapper(self, *args, **kwargs) -> Any:
-            同步包装逻辑, 子类需重写.
-        async_wrapper(self, *args, **kwargs) -> Any:
-            异步包装逻辑, 子类需重写.
+    使用方式:
+        1. 作为装饰器工厂使用:
+           @Decorator
+           def my_decorator(...): ...
+        2. 创建装饰器实例:
+           deco = Decorator(my_decorator)
+           @deco(param="value")
+           def func(): ...
+
+    传参模式:
+        1. **无参模式**: 返回当前实例
+            @my_decorator
+            def foo(): ...
+        2. **有参模式**: 直接传参
+            @my_decorator(prefix=">>>", suffix="<<<")
+            def bar(): ...
+        3. **分阶段传参**: 多次调用逐步累积参数
+            deco = my_decorator(prefix=">>>")
+            @deco(suffix="<<<")
+            def baz(): ...
+        4. **使用 Params 显式传参: 避免第一个参数歧义**
+            params = Params(prefix=">>>", suffix="<<<")
+            @my_decorator(params)
+            def qux(): ...
+        5. **Ellipsis 占位符**: 跳过参数, 保留之前的值
+            @my_decorator(..., suffix="<<<")
+            def quux(): ...
     """
 
-    FUNC_TYPES = (
-        types.FunctionType,
-        types.MethodType,
-        types.BuiltinFunctionType,
-        types.BuiltinMethodType,
-    )
-
-    cls: Type[Decorator]
-    func: Callable[..., Any]
-    args: tuple[Any]
+    decorator: DecoratorFunction[DP] | type[DecoratorClass[DP]]
+    signature: inspect.Signature
+    args_name_index: dict[str, int]
+    args: list[Any]
     kwargs: dict[str, Any]
 
-    @final
-    def __new__(cls, *args: Any, **kwargs: Any) -> Decorator:
-        self = object.__new__(Decorator)
-        self.cls = cls
-        self.args = tuple()
-        self.kwargs = dict()
-        return self.__call__(*args, **kwargs)
+    def __init__(
+        self,
+        target: DecoratorFunction[DP] | type[DecoratorClass[DP]] | Decorator[DP],
+    ) -> None:
+        """
+        初始化装饰器工厂. 
 
-    @final
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        if not args or not isinstance(args[0], self.FUNC_TYPES):
-            next_self = object.__new__(Decorator)
-            next_self.cls = self.cls
-            next_self.args = (*self.args, *args)
-            next_self.kwargs = {**self.kwargs, **kwargs}
-            return next_self.__call__
+        参数:
+            target: 被简化的装饰器函数或装饰器类, 必须符合相应协议
+        """
+        if isinstance(target, Decorator):
+            self.decorator = target.decorator
+            self.signature = target.signature
+            self.args_name_index = target.args_name_index
+            self.args = target.args
+            self.kwargs = target.kwargs
+        else:
+            self.decorator = target
+            self.signature = inspect.signature(self.decorator)
+            self.args_name_index = {}
+            self.args = list()
+            self.kwargs = dict()
+            self._initialize_parameters()
 
-        final_self = object.__new__(self.cls)
-        final_self.cls = self.cls
-        final_self.func = args[0]
-        final_self.args = (*self.args, *args[1:])
-        final_self.kwargs = {**self.kwargs, **kwargs}
-        final_self.__init__(*final_self.args, **final_self.kwargs)
-        return self._get_wrapper(final_self)
+    @overload
+    def __call__(self, func: Callable[P, R], params: Params[DP]) -> Callable[P, R]: ...
+    @overload
+    def __call__(
+        self, func: Callable[P, R], *args: DP.args, **kwargs: DP.kwargs
+    ) -> Callable[P, R]: ...
+    @overload
+    def __call__(
+        self, func: Callable[P, R], *args: Any, **kwargs: Any
+    ) -> Callable[P, R]: ...
+    @overload
+    def __call__(self, params: Params[DP]) -> Decorator[DP]: ...
+    @overload
+    def __call__(self, *args: DP.args, **kwargs: DP.kwargs) -> Decorator[DP]: ...
+    @overload
+    def __call__(self, *args: Any, **kwargs: Any) -> Decorator[DP]: ...
 
-    @final
-    def _get_wrapper(self, final_self: Decorator) -> Callable[..., Any]:
-        if asyncio.iscoroutinefunction(final_self.func):
+    def __call__(self, *args: Any, **next_kwargs: Any) -> Any:
+        """
+        实现装饰器的参数收集和函数包装逻辑. 
 
-            @functools.wraps(final_self.func)
-            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                return await final_self.async_wrapper(*args, **kwargs)
+        根据传入参数的不同类型, 自动识别并处理不同的使用模式. 
+        具体使用模式请参考类的文档字符串. 
+        """
+        if not args and not next_kwargs:
+            return self
 
-            return async_wrapper
+        next_args = list(args)
+        next_kwargs = dict(next_kwargs)
+        func, next_args = self._get_func(next_args)
+        next_args, next_kwargs = self._resolve_params(next_args, next_kwargs)
+        next_args, next_kwargs = self._merge_params(next_args, next_kwargs)
 
-        @functools.wraps(final_self.func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
-            return final_self.wrapper(*args, **kwargs)
+        if func:
+            next_args, next_kwargs = self._trim_params(next_args, next_kwargs)
+            if inspect.isclass(self.decorator):
+                self.signature.bind(func, *next_args, **next_kwargs)
+                wrapper = self.decorator(func, *tuple(next_args), **next_kwargs)
+            else:
+                self.signature.bind(func, (), {}, *next_args, **next_kwargs)
+                wrapper = self._create_function(func, next_args, next_kwargs)
+            functools.update_wrapper(wrapper, func)
+            return wrapper
+
+        next_self = type(self)(self)
+        next_self.args = next_args
+        next_self.kwargs = next_kwargs
+        return next_self
+
+    def _get_func(self, args: list[Any]) -> tuple[Callable[..., Any] | None, list[Any]]:
+        """
+        从参数中提取函数对象和剩余参数. 
+        """
+        if args and callable(args[0]):
+            return args[0], args[1:]
+        return None, args
+
+    def _resolve_params(
+        self, args: list[Any], kwargs: dict[str, Any]
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """
+        从参数中提取 `Params` 对象并返回其解包后的参数. 
+
+        支持形式:
+            - 位置参数传入 `Params` 实例
+            - 关键字参数传入 `params=Params` 实例
+        """
+        if (len(args) + len(kwargs)) == 1:
+            params = args[0] if args else kwargs.get("params")
+            if isinstance(params, Params):
+                return list(params.args), params.kwargs
+        return args, kwargs
+
+    def _merge_params(
+        self, args: list[Any], kwargs: dict[str, Any]
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """
+        合并参数, 将当前实例的参数与新传入的参数合并. 
+        """
+        merged_args = list(
+            old if new is Ellipsis else new
+            for new, old in zip_longest(args, self.args, fillvalue=Ellipsis)
+        )
+
+        merged_kwargs = dict(self.kwargs)
+        for k, v in kwargs.items():
+            if v is Ellipsis:
+                continue
+
+            index = self.args_name_index.get(k)
+            if index is not None:
+                # 列表乘负数时结果为空, 相当于 `[Ellipsis] * 0`
+                merged_args += [Ellipsis] * (index - len(merged_args) + 1)
+                merged_args[index] = v
+            else:
+                merged_kwargs[k] = v
+
+        return merged_args, merged_kwargs
+
+    def _trim_params(
+        self, args: list[Any], kwargs: dict[str, Any]
+    ) -> tuple[list[Any], dict[str, Any]]:
+        """
+        从参数中移除占位符. 
+        """
+        args = [arg for arg in args if arg is not Ellipsis]
+        kwargs = {k: v for k, v in kwargs.items() if v is not Ellipsis}
+        return args, kwargs
+
+    def _create_function(
+        self,
+        func: Callable[P, R],
+        decorator_args: list[Any],
+        decorator_kwargs: dict[str, Any],
+    ) -> Callable[P, R]:
+        """
+        创建一个闭包装饰器, 将装饰器参数封装起来. 
+        """
+        decorator = cast(DecoratorFunction, self.decorator)
+
+        def wrapper(*func_args: P.args, **func_kwargs: P.kwargs) -> R:
+            return decorator(
+                func, func_args, func_kwargs, *decorator_args, **decorator_kwargs
+            )
 
         return wrapper
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def _initialize_parameters(self) -> None:
         """
-        装饰器初始化方法.
-
-        这里是注册装饰器参数的地方:
-            - 在绑定函数阶段(阶段 2)调用.
-            - `args` / `kwargs` 包含了在参数收集阶段传入的所有装饰器参数.
-            - 子类可在此方法中解析并保存装饰器参数到实例属性.
-
-        默认实现为空, 不做任何处理.
+        初始化参数容器, 根据装饰器类型和参数签名设置默认值. 
         """
-        pass
+        parameters = list(self.signature.parameters.values())
+        if not inspect.isclass(self.decorator):
+            parameters = parameters[3:]
 
-    def wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        包装被装饰的函数以进行同步执行.
-
-        当被装饰的函数是同步函数时调用此方法.
-
-        参数:
-            *args (Any): 传递给被装饰函数的位置参数.
-            **kwargs (Any): 传递给被装饰函数的关键字参数.
-
-        返回:
-            Any: 被装饰函数的结果.
-
-        异常:
-            Exception: 如果执行失败, 则抛出引发的异常.
-        """
-        return self.func(*args, **kwargs)
-
-    async def async_wrapper(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        包装被装饰的函数以进行异步执行.
-
-        当被装饰的函数是异步函数时调用此方法.
-
-        参数:
-            *args (Any): 传递给被装饰函数的位置参数.
-            **kwargs (Any): 传递给被装饰函数的关键字参数.
-
-        返回:
-            Any: 被装饰函数的结果.
-
-        异常:
-            Exception: 如果执行失败, 则抛出引发的异常.
-        """
-        return await self.func(*args, **kwargs)
+        for index, parameter in enumerate(parameters):
+            default = (
+                Ellipsis
+                if parameter.default == inspect.Parameter.empty
+                else parameter.default
+            )
+            if parameter.kind == inspect.Parameter.POSITIONAL_ONLY:
+                self.args.append(default)
+            if parameter.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD:
+                self.args_name_index[parameter.name] = index
+                self.args.append(default)
+            if parameter.kind == inspect.Parameter.KEYWORD_ONLY:
+                self.kwargs[parameter.name] = default

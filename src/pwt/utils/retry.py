@@ -4,16 +4,16 @@
 该模块提供了重试装饰器和相关工具函数,用于在函数执行后根据条件自动重试.
 
 主要功能:
-    - 提供了 `Retry` 装饰器,用于装饰需要重试的函数.
+    - 提供了 `_Retry` 装饰器,用于装饰需要重试的函数.
     - 支持同步和异步函数的重试.
     - 提供了多种重试策略,如固定间隔/指数退避等.
     - 支持根据异常类型/返回值等条件判断是否重试.
 
 模块结构:
     - RetryState: 重试状态类,用于存储重试操作的相关信息.
-    - Retry: 重试装饰器类,用于执行重试操作.
-    - SimpleRetry: 简单重试装饰器类,继承自 Retry.
-    - AdvancedRetry: 高级重试装饰器类,继承自 Retry.
+    - Retry: 重试装饰器类,用于执行重试操作, 由 `_Retry` 导出.
+    - SimpleRetry: 简单重试装饰器类,继承自 `_Retry`, 由 `_SimpleRetry` 导出.
+    - AdvancedRetry: 高级重试装饰器类,继承自 `_Retry`, 由 `_AdvancedRetry` 导出.
     - exponential_backoff_interval: 间隔函数构造器,用于生成指数退避间隔函数.
     - fixd_interval: 间隔函数构造器,用于生成固定间隔函数.
     - retries_retryable: 可重试函数构造器,用于生成根据重试次数判断是否可重试的函数.
@@ -113,14 +113,14 @@ class RetryState:
         )
 
 
-class Retry(Decorator):
+class _Retry:
     """
     重试装饰器类
 
     用于执行重试操作, 继承自 `Decorator` 类.
 
     属性:
-
+        func (Callable[..., Any]): 要重试的函数.
         interval (Callable[[RetryState], float]): 计算延迟时间的函数.
         retryable (Callable[[RetryState], bool]): 判断是否可重试的函数.
 
@@ -131,6 +131,7 @@ class Retry(Decorator):
 
     def __init__(
         self,
+        func: Callable[..., Any],
         *,
         interval: Callable[[RetryState], float],
         retryable: Callable[[RetryState], bool],
@@ -142,9 +143,14 @@ class Retry(Decorator):
             interval (Callable[[RetryState], float]): 计算延迟时间的函数.
             retryable (Callable[[RetryState], bool]): 判断是否可重试的函数.
         """
-        super().__init__(interval=interval, retryable=retryable)
+        self.func = func
         self.interval = interval
         self.retryable = retryable
+
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        if asyncio.iscoroutinefunction(self.func):
+            return self.async_wrapper(*args, **kwds)
+        return self.wrapper(*args, **kwds)
 
     def wrapper(self, *args: Any, **kwargs: Any) -> Any:
         """
@@ -200,77 +206,77 @@ class Retry(Decorator):
         state = RetryState(self.func, *args, **kwargs)
         while True:
             state.result = state.exception = None
-            # log_utils.debug(f"Retry - 执行 - {state}")
             try:
                 state.result = await self.func(*args, **kwargs)
             except Exception as ex:
                 state.exception = ex
             if not self.retryable(state):
-                # log_utils.debug(f"Retry - 结束 - {state}")
                 if state.exception:
                     raise state.exception
                 return state.result
-            # log_utils.debug(f"Retry - 失败 - {state}")
             state.attempts += 1
             state.delay = self.interval(state)
-            # log_utils.debug(f"Retry - 延迟 - {state}")
             await asyncio.sleep(state.delay)
 
 
-class SimpleRetry(Retry):
+class _SimpleRetry(_Retry):
     """
     简单重试装饰器类
 
-    用于执行重试操作, 继承自 `Retry` 类.
+    用于执行重试操作, 继承自 `_Retry` 类.
     """
 
     def __init__(
         self,
+        func: Callable[..., Any],
         *,
         delay: float = 1,
         retries: int = 3,
-        exceptions: Iterable[Type[Exception]] = [Exception],
-        results: Iterable[Any] = [],
+        exceptions: Iterable[Type[Exception]] = (Exception,),
+        results: Iterable[Any] = (),
     ) -> None:
         """
         初始化 `SimpleRetry` 实例.
 
         参数:
-            func (Callable[..., Any]): 要重试的函数, 用 `Self` 占位.
+            func (Callable[..., Any]): 要重试的函数.
             delay (float, 可选): 重试的延迟时间(秒), 默认为 `1` 秒.
             retries (int, 可选): 重试次数, 默认为 `3` 次.
             exceptions (Iterable[Type[Exception]], 可选): 可重试的异常类型列表, 默认为所有异常.
             results (Iterable[Any], 可选): 可重试的结果列表, 默认为空列表.
         """
         super().__init__(
+            func,
             interval=fixd_interval(delay),
             retryable=fixd_retryable(retries, exceptions, results),
         )
+        self.func = func
 
 
-class AdvancedRetry(Retry):
+class _AdvancedRetry(_Retry):
     """
     高级重试装饰器类
 
-    用于执行重试操作, 继承自 `Retry` 类.
+    用于执行重试操作, 继承自 `_Retry` 类.
     """
 
     def __init__(
         self,
+        func: Callable[..., Any],
         *,
         factor: float = 1,
         maximum: float = 64,
         base: int = 2,
         jitter: bool = False,
         retries: int = 3,
-        exceptions: Iterable[Type[Exception]] = [Exception],
-        results: Iterable[Any] = [],
+        exceptions: Iterable[Type[Exception]] = (Exception,),
+        results: Iterable[Any] = (),
     ) -> None:
         """
         初始化 `AdvancedRetry` 实例
 
         参数:
-            func (Callable[..., Any]): 要重试的函数, 用 `Self` 占位.
+            func (Callable[..., Any]): 要重试的函数.
             factor (float, 可选): 因子,用于计算重试间隔时间
             maximum (float, 可选): 最大重试间隔时间
             base (int, 可选): 指数退避的基数
@@ -280,9 +286,16 @@ class AdvancedRetry(Retry):
             results (Iterable[Any], 可选): 可重试的结果列表, 默认为空列表.
         """
         super().__init__(
+            func,
             interval=exponential_backoff_interval(factor, maximum, base, jitter),
             retryable=fixd_retryable(retries, exceptions, results),
         )
+        self.func = func
+
+
+Retry = Decorator(_Retry)
+SimpleRetry = Decorator(_SimpleRetry)
+AdvancedRetry = Decorator(_AdvancedRetry)
 
 
 def exponential_backoff_interval(
@@ -346,7 +359,7 @@ def exception_retryable(*exceptions: Type[Exception]) -> Callable[[RetryState], 
     该函数用于生成一个可重试函数,该函数根据异常类型判断是否可重试.
 
     参数:
-        exceptions (Type[Exception]): 异常类型列表.
+        *exceptions (Type[Exception]): 异常类型列表.
 
     返回:
         Callable[[RetryState], bool]: 一个函数,该函数接受一个 `RetryState` 对象并返回一个布尔值,表示是否可重试.
@@ -361,7 +374,7 @@ def results_retryable(*results: Any) -> Callable[[RetryState], bool]:
     该函数用于生成一个可重试函数,该函数根据函数的返回值判断是否可重试.
 
     参数:
-        results (Any): 可重试的返回值列表.
+        *results (Any): 可重试的返回值列表.
 
     返回:
         Callable[[RetryState], bool]: 一个函数,该函数接受一个 `RetryState` 对象并返回一个布尔值,表示是否可重试.
