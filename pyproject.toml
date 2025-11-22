@@ -10,12 +10,10 @@ dependencies = []
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=1.0.0",
-    "requests",
     "numpy",
     "pydantic",
     "rule_engine",
 ]
-http = ["requests"]
 ndarray-audio-utils = ["numpy"]
 expression = ["rule_engine"]
 pydantic-utils = ["pydantic", "rule_engine"]
