@@ -13,12 +13,14 @@ dev = [
     "numpy",
     "pydantic",
     "rule_engine",
+    "rich",
 ]
 ndarray-audio-utils = ["numpy"]
 expression = ["rule_engine"]
 pydantic-utils = ["pydantic", "rule_engine"]
 log-filter = ["rule_engine"]
 log-config = ["pydantic", "rule_engine"]
+log-console = ["rich"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"

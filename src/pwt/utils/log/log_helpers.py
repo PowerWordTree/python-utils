@@ -10,12 +10,22 @@ from typing import Any, Iterable, Literal
 
 from pwt.utils import json_normalizer
 
+# fmt: off
+# 自定义的 `logSection` 作为终端输出时的段落标记使用
+RESERVED_FIELDS = {
+    'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename', 'module',
+    'exc_info', 'exc_text', 'stack_info', 'lineno', 'funcName', 'created', 'msecs',
+    'relativeCreated', 'thread', 'threadName', 'processName', 'process', 'taskName',
+    'message', 'asctime', 'stacklevel', 'logger', 'logSection'
+}
+# fmt: on
 
-def get_logger_adapter(name: str | None = None) -> LoggerAdapter:
-    return LoggerAdapter(logging.getLogger(name))
+
+def get_logger_adapter(name: str | None = None) -> FmtLoggerAdapter:
+    return FmtLoggerAdapter(logging.getLogger(name))
 
 
-def get_standard_logger_adapter(name: str | None = None) -> LoggerAdapter:
+def get_standard_logger_adapter(name: str | None = None) -> FmtLoggerAdapter:
     """
     获取日志记录器并进行基本配置.
 
@@ -32,7 +42,7 @@ def get_standard_logger_adapter(name: str | None = None) -> LoggerAdapter:
     formatter = EnhancedFormatter()
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    return LoggerAdapter(logger)
+    return FmtLoggerAdapter(logger)
 
 
 class StandardHandler(logging.Handler):
@@ -72,15 +82,6 @@ class EnhancedFormatter(logging.Formatter):
     """
     扩展的日志格式化器
     """
-
-    # fmt: off
-    RESERVED_FIELDS = {
-        'name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename', 'module',
-        'exc_info', 'exc_text', 'stack_info', 'lineno', 'funcName', 'created', 'msecs',
-        'relativeCreated', 'thread', 'threadName', 'processName', 'process', 'taskName',
-        'message', 'asctime', 'stacklevel', 'logger'
-    }
-    # fmt: on
 
     def __init__(
         self,
@@ -153,7 +154,7 @@ class EnhancedFormatter(logging.Formatter):
             json_dict["stack"] = record.stack_info.splitlines()
         # 扩展字段
         for key, value in vars(record).items():
-            if key not in self.RESERVED_FIELDS and not key.startswith("_"):
+            if key not in RESERVED_FIELDS and not key.startswith("_"):
                 json_dict[key] = value
 
         return json.dumps(
@@ -164,7 +165,7 @@ class EnhancedFormatter(logging.Formatter):
         )
 
 
-class LoggerAdapter:
+class FmtLoggerAdapter:
     """
     日志适配器, 封装标准库 `logging.Logger`
 
@@ -181,7 +182,7 @@ class LoggerAdapter:
     """
 
     def __init__(self, logger: logging.Logger, **extra: Any) -> None:
-        self.logger = logger
+        self.target = logger
         self.extra = extra
 
     def process(
@@ -225,7 +226,7 @@ class LoggerAdapter:
 
     def log(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
         level, msg, args, kwargs = self.process(level, msg, "%", args, kwargs)
-        self.logger.log(level, msg, *args, **kwargs)
+        self.target.log(level, msg, *args, **kwargs)
 
     def debugf(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.logf(logging.DEBUG, msg, *args, **kwargs)
@@ -244,7 +245,7 @@ class LoggerAdapter:
 
     def logf(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
         level, msg, args, kwargs = self.process(level, msg, "{", args, kwargs)
-        self.logger.log(level, msg, *args, **kwargs)
+        self.target.log(level, msg, *args, **kwargs)
 
     def debugt(self, msg: str, *args: Any, **kwargs: Any) -> None:
         self.logt(logging.DEBUG, msg, *args, **kwargs)
@@ -263,7 +264,7 @@ class LoggerAdapter:
 
     def logt(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
         level, msg, args, kwargs = self.process(level, msg, "$", args, kwargs)
-        self.logger.log(level, msg, *args, **kwargs)
+        self.target.log(level, msg, *args, **kwargs)
 
 
 def get_level_names_mapping():
