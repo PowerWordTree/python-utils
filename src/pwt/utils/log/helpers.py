@@ -278,7 +278,7 @@ def get_level_names_mapping():
     else:
         # Python <= 3.10, 基于内部变量构造只读映射
         # 用 MappingProxyType 包一层, 避免调用方修改原 dict
-        return MappingProxyType(dict(logging._nameToLevel))
+        return MappingProxyType(logging._nameToLevel)
 
 
 def level_range(
@@ -306,12 +306,11 @@ def get_level(name: str) -> int:
     参数:
         name: 字符串形式的等级
     返回:
-        数值形式的等级
-    异常:
-        ValueError: 无此等级时抛出
+        数值形式的等级, 若不存在则返回 NOTSET.
     """
 
     mapping = get_level_names_mapping()
+    name = name.upper()
     if name not in mapping:
-        raise ValueError(f"Unknown level: {name}")
+        return logging.NOTSET
     return mapping[name]

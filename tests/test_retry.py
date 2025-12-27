@@ -1,7 +1,7 @@
 """
 重试模块单元测试
 
-该测试文件覆盖了 pwt.utils.retry 模块的所有主要功能，包括：
+该测试文件覆盖了 pwt.utils.retry 模块的所有主要功能, 包括: 
 - RetryState 类
 - 各种重试装饰器 (Retry, SimpleRetry, AdvancedRetry)
 - 间隔函数 (exponential_backoff_interval, fixd_interval)
@@ -91,7 +91,7 @@ class TestIntervalFunctions:
         assert interval_func(state) == 4  # 2^2 * 1 = 4
 
         state.attempts = 5
-        assert interval_func(state) == 10  # 2^5 * 1 = 32，但被最大值10限制
+        assert interval_func(state) == 10  # 2^5 * 1 = 32, 但被最大值10限制
 
     def test_exponential_backoff_interval_with_jitter(self):
         """测试带抖动的指数退避间隔函数"""
@@ -175,7 +175,7 @@ class TestRetryableFunctions:
         assert retryable_func(state) is False  # 超过重试次数
 
         state.attempts = 2
-        assert retryable_func(state) is True  # 在重试次数内，有匹配异常
+        assert retryable_func(state) is True  # 在重试次数内, 有匹配异常
 
         # 测试返回值匹配
         state.exception = None
@@ -183,7 +183,7 @@ class TestRetryableFunctions:
         assert retryable_func(state) is True  # 匹配返回值
 
         state.result = "success"
-        assert retryable_func(state) is False  # 不匹配返回值，也没有异常
+        assert retryable_func(state) is False  # 不匹配返回值, 也没有异常
 
     def test_all_retryable(self):
         """测试全部条件判断函数"""
@@ -406,7 +406,7 @@ class TestHelperFunctions:
         assert _exponential_backoff(2, 3, 20) == 16  # 2^3 * 2 = 16
 
         # 测试最大值限制
-        assert _exponential_backoff(1, 5, 10) == 10  # 2^5 * 1 = 32，但被最大值10限制
+        assert _exponential_backoff(1, 5, 10) == 10  # 2^5 * 1 = 32, 但被最大值10限制
 
         # 测试非2的基数
         assert _exponential_backoff(1, 2, 10, base=3) == 9  # 3^2 * 1 = 9

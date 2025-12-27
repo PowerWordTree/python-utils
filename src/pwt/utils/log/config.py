@@ -9,8 +9,8 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from pwt.utils.log import log_helpers
-from pwt.utils.log.log_filters import FieldFilter
+from pwt.utils.log import helpers
+from pwt.utils.log.filters import FieldFilter
 from pwt.utils.pydantic_utils import BaseModelEx, check, convert
 
 OUTPUT_DEFAULT = "std"
@@ -88,7 +88,7 @@ def get_handler(log: Handler) -> logging.Handler:
         FileNotFoundError, PermissionError: 读写文件错误
     """
     if log.output == "std":
-        handler = log_helpers.StandardHandler()
+        handler = helpers.StandardHandler()
     elif log.output == "stdout":
         handler = logging.StreamHandler(sys.stdout)
     elif log.output == "stderr":
@@ -96,7 +96,7 @@ def get_handler(log: Handler) -> logging.Handler:
     else:
         handler = logging.handlers.WatchedFileHandler(log.output)
 
-    formatter = log_helpers.EnhancedFormatter(
+    formatter = helpers.EnhancedFormatter(
         log.text_format,
         log.date_format,
         style="{",

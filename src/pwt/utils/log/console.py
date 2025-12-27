@@ -1,11 +1,17 @@
+from __future__ import annotations
+
 import logging
 import sys
+from typing import Any
 
+from pwt.utils.log.helpers import EnhancedFormatter, FmtLoggerAdapter
 from rich.console import ConsoleRenderable, RenderableType
 from rich.logging import RichHandler
 from rich.text import Text
 
-from pwt.utils.log.log_helpers import EnhancedFormatter, FmtLoggerAdapter
+
+def get_sytled_logger_adapter(name: str | None = None) -> StyledLoggerAdapter:
+    return StyledLoggerAdapter(logging.getLogger(name))
 
 
 def get_sytled_standard_logger_adapter(
@@ -14,28 +20,14 @@ def get_sytled_standard_logger_adapter(
     show_time: bool = False,
     show_level: bool = False,
     keywords: list[str] | None = None,
-) -> FmtLoggerAdapter:
-    """
-    获取风格化的日志记录器并进行基本配置.
-
-    参数:
-        name (str | None): 日志记录器的名称.
-        spacing (RenderableType | str | None): 段落分隔符,
-        show_time (bool): 是否显示时间.
-        show_level (bool): 是否显示日志级别.
-        keywords (list[str] | None): 关键词列表.
-
-    返回:
-        logging.Logger: 配置好的日志记录器.
-    """
-
+) -> StyledLoggerAdapter:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     handler = StyledStandardHandler(spacing, show_time, show_level, keywords)
     formatter = EnhancedFormatter(textfmt="{message}")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-    return FmtLoggerAdapter(logger)
+    return StyledLoggerAdapter(logger)
 
 
 class StyledStandardHandler(RichHandler):
@@ -95,3 +87,19 @@ class StyledStandardHandler(RichHandler):
                 text.stylize("bold white on red")
 
         return text
+
+
+class StyledLoggerAdapter(FmtLoggerAdapter):
+    def __init__(self, logger: logging.Logger, **extra: Any) -> None:
+        super().__init__(logger, **extra)
+
+    def log_section(self, section: Any) -> None:
+        logger = self.target
+        while logger:
+            for handler in logger.handlers:
+                if isinstance(handler, StyledStandardHandler):
+                    handler.last_section = section
+            if not logger.propagate:
+                break
+            else:
+                logger = logger.parent
