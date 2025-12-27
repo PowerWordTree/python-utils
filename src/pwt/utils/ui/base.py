@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import Any, Callable
 
-from pwt.winenv_cli.ui.protocol import UIMessageProtocol, UIProtocol
+from pwt.utils.ui.protocol import UIMessageProtocol, UIProtocol
 
 
 class BaseUIMessage(UIMessageProtocol):

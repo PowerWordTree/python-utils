@@ -3,7 +3,8 @@ import tempfile
 import traceback
 from typing import Callable
 
-from pwt.winenv_cli.ui.base import UIProtocol, UIRegistry
+from pwt.utils.ui.base import UIRegistry
+from pwt.utils.ui.protocol import UIProtocol
 
 
 def create_ui_from_args(argv: list[str] | None = None) -> tuple[UIProtocol, list[str]]:

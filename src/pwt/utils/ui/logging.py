@@ -5,8 +5,8 @@ from typing import Any
 
 from pwt.utils.log import helpers
 
-from pwt.winenv_cli.ui.base import BaseUIMessage, UIRegistry
-from pwt.winenv_cli.ui.protocol import UIMessageProtocol, UIProtocol
+from pwt.utils.ui.base import BaseUIMessage, UIRegistry
+from pwt.utils.ui.protocol import UIMessageProtocol, UIProtocol
 
 
 class LoggingUIMessage(BaseUIMessage):
